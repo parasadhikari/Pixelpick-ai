@@ -14,6 +14,7 @@ const UploadBox = () => {
     const [mode, setMode] = useState("browse");
     const [imageLink, setImageLink] = useState("");
     const API_URL =
+        import.meta.env.VITE_API_URL ||
         "http://localhost:5000";
     // --------------------------------
     // HANDLE IMAGE
