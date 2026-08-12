@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-
 import imageProxyRouter from "./routes/imageProxy.js";
 
 dotenv.config();
@@ -14,11 +13,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 // --------------------------------
 
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-  })
-);
+app.use(cors());
 
 app.use(express.json());
 
@@ -27,8 +22,8 @@ app.use(express.json());
 // --------------------------------
 
 app.use(
-  "/api",
-  imageProxyRouter
+    "/api",
+    imageProxyRouter
 );
 
 // --------------------------------
@@ -36,9 +31,9 @@ app.use(
 // --------------------------------
 
 app.get("/", (req, res) => {
-  res.json({
-    message: "PixelPick AI server is running 🚀",
-  });
+    res.json({
+        message: "PixelPick AI server is running 🚀",
+    });
 });
 
 // --------------------------------
@@ -46,7 +41,7 @@ app.get("/", (req, res) => {
 // --------------------------------
 
 app.listen(PORT, () => {
-  console.log(
-    `🚀 PixelPick AI server running on port ${PORT}`
-  );
+    console.log(
+        `🚀 PixelPick AI server running on port ${PORT}`
+    );
 });
