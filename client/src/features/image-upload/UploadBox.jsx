@@ -15,7 +15,7 @@ const UploadBox = () => {
     const [mode, setMode] = useState("browse");
     const [imageLink, setImageLink] = useState("");
     const [cameraReady, setCameraReady] = useState(false);
-
+    const [cameraStarting, setCameraStarting] = useState(false);
     const API_URL =
         import.meta.env.VITE_API_URL ||
         "http://localhost:5000";
@@ -227,142 +227,387 @@ const UploadBox = () => {
     // ==========================================
 
     const stopCamera = () => {
-        if (streamRef.current) {
-            streamRef.current
-                .getTracks()
-                .forEach((track) =>
-                    track.stop()
-                );
+        const stream = streamRef.current;
+
+        if (stream) {
+            stream.getTracks().forEach((track) => {
+                track.stop();
+            });
 
             streamRef.current = null;
         }
 
+        if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.srcObject = null;
+        }
+
         setCameraReady(false);
+        setCameraStarting(false);
     };
 
     const startCamera = async () => {
-        try {
-            stopCamera();
+        // Stop any previous stream
+        stopCamera();
 
-            if (
-                !navigator.mediaDevices ||
-                !navigator.mediaDevices.getUserMedia
-            ) {
-                toast.error(
-                    "Camera is not supported by this browser."
-                );
-                return;
-            }
-
-            const stream =
-                await navigator.mediaDevices.getUserMedia(
-                    {
-                        video: {
-                            facingMode: {
-                                ideal: "environment",
-                            },
-                        },
-                        audio: false,
-                    }
-                );
-
-            streamRef.current = stream;
-
-            if (videoRef.current) {
-                videoRef.current.srcObject =
-                    stream;
-
-                await videoRef.current.play();
-            }
-
-            setCameraReady(true);
-
-        } catch (error) {
-            console.error("Camera error:", error);
-
-            if (error.name === "NotAllowedError") {
-                toast.error(
-                    "Camera permission was denied. Please allow camera access in your browser settings."
-                );
-            } else if (error.name === "NotFoundError") {
-                toast.error(
-                    "No camera was found on this device."
-                );
-            } else if (error.name === "NotReadableError") {
-                toast.error(
-                    "Camera is already being used by another application."
-                );
-            } else if (error.name === "SecurityError") {
-                toast.error(
-                    "Camera access is blocked by browser security settings."
-                );
-            } else {
-                toast.error(
-                    "Unable to access the camera."
-                );
-            }
-        }
-    };
-
-    const capturePhoto = () => {
-        const video = videoRef.current;
-
+        // Check browser support
         if (
-            !video ||
-            !video.videoWidth ||
-            !video.videoHeight
+            !navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia
         ) {
             toast.error(
-                "Camera is not ready yet."
+                "Camera is not supported by this browser."
             );
             return;
         }
 
-        const canvas =
-            document.createElement("canvas");
+        // Camera requires HTTPS or localhost
+        if (!window.isSecureContext) {
+            toast.error(
+                "Camera requires a secure HTTPS connection."
+            );
+            return;
+        }
 
-        canvas.width =
-            video.videoWidth;
+        try {
+            setCameraStarting(true);
 
-        canvas.height =
-            video.videoHeight;
+            // ------------------------------------------
+            // CAMERA CONSTRAINTS
+            // ------------------------------------------
 
-        const ctx =
-            canvas.getContext("2d");
-
-        ctx.drawImage(
-            video,
-            0,
-            0,
-            canvas.width,
-            canvas.height
-        );
-
-        canvas.toBlob(
-            (blob) => {
-                if (!blob) {
-                    toast.error(
-                        "Could not capture photo."
-                    );
-                    return;
-                }
-
-                const file = new File(
-                    [blob],
-                    "pixelpick-camera.jpg",
-                    {
-                        type: "image/jpeg",
-                    }
+            const isMobile =
+                /Android|iPhone|iPad|iPod/i.test(
+                    navigator.userAgent
                 );
 
-                stopCamera();
+            const constraints = {
+                audio: false,
 
-                handleFile(file);
-            },
-            "image/jpeg",
-            0.92
-        );
+                video: isMobile
+                    ? {
+                        facingMode: {
+                            ideal: "environment",
+                        },
+
+                        width: {
+                            ideal: 1920,
+                        },
+
+                        height: {
+                            ideal: 1080,
+                        },
+                    }
+                    : {
+                        width: {
+                            ideal: 1920,
+                        },
+
+                        height: {
+                            ideal: 1080,
+                        },
+                    },
+            };
+
+            // ------------------------------------------
+            // REQUEST CAMERA
+            // ------------------------------------------
+
+            let stream;
+
+            try {
+                stream =
+                    await navigator.mediaDevices.getUserMedia(
+                        constraints
+                    );
+            } catch (error) {
+                console.warn(
+                    "Preferred camera settings failed:",
+                    error
+                );
+
+                // Fallback to basic camera
+                stream =
+                    await navigator.mediaDevices.getUserMedia(
+                        {
+                            video: true,
+                            audio: false,
+                        }
+                    );
+            }
+
+            streamRef.current = stream;
+
+            // React has now been told that camera is starting.
+            // The video element will be rendered because
+            // cameraStarting === true.
+            const video = videoRef.current;
+
+            if (!video) {
+                // Give React one more chance to render the video.
+                await new Promise((resolve) =>
+                    setTimeout(resolve, 100)
+                );
+            }
+
+            const currentVideo = videoRef.current;
+
+            if (!currentVideo) {
+                stream
+                    .getTracks()
+                    .forEach((track) =>
+                        track.stop()
+                    );
+
+                streamRef.current = null;
+
+                throw new Error(
+                    "Camera preview could not be initialized."
+                );
+            }
+
+            // ------------------------------------------
+            // ATTACH STREAM
+            // ------------------------------------------
+
+            currentVideo.srcObject = stream;
+
+            currentVideo.muted = true;
+            currentVideo.autoplay = true;
+            currentVideo.playsInline = true;
+
+            // ------------------------------------------
+            // WAIT FOR VIDEO METADATA
+            // ------------------------------------------
+
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(
+                        new Error(
+                            "Camera took too long to start."
+                        )
+                    );
+                }, 10000);
+
+                const handleReady = () => {
+                    clearTimeout(timeout);
+
+                    video.removeEventListener(
+                        "loadedmetadata",
+                        handleReady
+                    );
+
+                    resolve();
+                };
+
+                currentVideo.addEventListener(
+                    "loadedmetadata",
+                    handleReady
+                );
+                // Some browsers may already have metadata
+                if (
+                    currentVideo.readyState >= 1 &&
+                    currentVideo.videoWidth > 0
+                ) {
+                    handleReady();
+                }
+            });
+
+            // ------------------------------------------
+            // START VIDEO
+            // ------------------------------------------
+
+            await currentVideo.play();
+
+            // ------------------------------------------
+            // VERIFY CAMERA
+            // ------------------------------------------
+
+            if (
+                currentVideo.videoWidth === 0 ||
+                currentVideo.videoHeight === 0
+            ) {
+                throw new Error(
+                    "Camera started but no video frame is available."
+                );
+            }
+
+            setCameraReady(true);
+            setCameraStarting(false);
+
+            toast.success(
+                "Camera ready"
+            );
+
+        } catch (error) {
+            console.error(
+                "Camera error:",
+                error
+            );
+
+            stopCamera();
+
+            setCameraStarting(false);
+
+            if (
+                error.name ===
+                "NotAllowedError"
+            ) {
+                toast.error(
+                    "Camera permission was denied. Allow camera access in your browser settings and try again."
+                );
+            } else if (
+                error.name ===
+                "NotFoundError"
+            ) {
+                toast.error(
+                    "No camera was found on this device."
+                );
+            } else if (
+                error.name ===
+                "NotReadableError"
+            ) {
+                toast.error(
+                    "The camera is already being used by another application."
+                );
+            } else if (
+                error.name ===
+                "SecurityError"
+            ) {
+                toast.error(
+                    "Camera access was blocked by browser security settings."
+                );
+            } else {
+                toast.error(
+                    error.message ||
+                    "Unable to start the camera."
+                );
+            }
+        }
     };
+
+    const capturePhoto = async () => {
+        const video = videoRef.current;
+
+        if (
+            !video ||
+            !cameraReady ||
+            !video.videoWidth ||
+            !video.videoHeight
+        ) {
+            toast.error(
+                "Please wait until the camera preview is ready."
+            );
+
+            return;
+        }
+
+        try {
+            const canvas =
+                document.createElement(
+                    "canvas"
+                );
+
+            const width =
+                video.videoWidth;
+
+            const height =
+                video.videoHeight;
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx =
+                canvas.getContext("2d");
+
+            if (!ctx) {
+                throw new Error(
+                    "Could not create image canvas."
+                );
+            }
+
+            // ------------------------------------------
+            // CAPTURE FRAME
+            // ------------------------------------------
+
+            ctx.drawImage(
+                video,
+                0,
+                0,
+                width,
+                height
+            );
+
+            // ------------------------------------------
+            // CONVERT TO IMAGE
+            // ------------------------------------------
+
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) {
+                        toast.error(
+                            "Could not capture photo."
+                        );
+
+                        return;
+                    }
+
+                    const file = new File(
+                        [blob],
+                        "pixelpick-camera.jpg",
+                        {
+                            type: "image/jpeg",
+                            lastModified:
+                                Date.now(),
+                        }
+                    );
+
+                    // Stop camera first
+                    stopCamera();
+
+                    // Send captured image
+                    // through existing upload pipeline
+                    handleFile(file);
+                },
+                "image/jpeg",
+                0.92
+            );
+
+        } catch (error) {
+            console.error(
+                "Capture error:",
+                error
+            );
+
+            toast.error(
+                "Could not capture photo."
+            );
+        }
+    };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // ==========================================
     // CLEANUP CAMERA
@@ -542,7 +787,6 @@ const UploadBox = () => {
                     type="button"
                     onClick={() => {
                         changeMode("camera");
-                        startCamera();
                     }}
                     className={optionClass("camera")}
                 >
@@ -715,40 +959,36 @@ const UploadBox = () => {
             {mode === "camera" && (
                 <div
                     className="
-                        mt-5
-                        rounded-2xl
-                        border
-                        border-gray-200
-                        dark:border-gray-700
-                        bg-gray-50
-                        dark:bg-gray-800/50
-                        p-4
-                        sm:p-5
-                    "
+            mt-5
+            rounded-2xl
+            border
+            border-gray-200
+            dark:border-gray-700
+            bg-gray-50
+            dark:bg-gray-800/50
+            p-4
+            sm:p-5
+        "
                 >
 
                     <div className="flex items-center justify-between mb-4">
 
                         <div>
-                            <h3
-                                className="
-                                    text-lg
-                                    font-bold
-                                    text-gray-900
-                                    dark:text-white
-                                "
-                            >
+                            <h3 className="
+                    text-lg
+                    font-bold
+                    text-gray-900
+                    dark:text-white
+                ">
                                 📷 Take a Photo
                             </h3>
 
-                            <p
-                                className="
-                                    text-xs
-                                    text-gray-500
-                                    dark:text-gray-400
-                                    mt-1
-                                "
-                            >
+                            <p className="
+                    text-xs
+                    text-gray-500
+                    dark:text-gray-400
+                    mt-1
+                ">
                                 Use your camera to capture an image.
                             </p>
                         </div>
@@ -756,115 +996,145 @@ const UploadBox = () => {
                     </div>
 
 
-                    {!cameraReady ? (
+                    {/* CAMERA PREVIEW */}
 
-                        <div className="text-center py-8">
+                    <div
+                        className="
+                relative
+                w-full
+                min-h-[250px]
+                rounded-2xl
+                overflow-hidden
+                bg-black
+                flex
+                items-center
+                justify-center
+            "
+                    >
 
-                            <div className="text-5xl mb-4">
-                                📷
-                            </div>
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="
+                    w-full
+                    max-h-[450px]
+                    rounded-2xl
+                    object-contain
+                    bg-black
+                "
+                        />
 
-                            <p
+                        {!cameraReady && (
+                            <div
                                 className="
-                                    text-sm
-                                    text-gray-500
-                                    dark:text-gray-400
-                                    mb-4
-                                "
+                        absolute
+                        inset-0
+                        flex
+                        flex-col
+                        items-center
+                        justify-center
+                        bg-gray-100
+                        dark:bg-gray-800
+                    "
                             >
-                                Camera is ready to start.
-                            </p>
+
+                                <div className="text-5xl mb-4">
+                                    📷
+                                </div>
+
+                                <p className="
+                        text-sm
+                        text-gray-500
+                        dark:text-gray-400
+                        mb-4
+                    ">
+                                    {cameraStarting
+                                        ? "Starting camera..."
+                                        : "Camera is ready to start."}
+                                </p>
+
+                                {!cameraStarting && (
+                                    <button
+                                        type="button"
+                                        onClick={startCamera}
+                                        className="
+                                bg-blue-600
+                                hover:bg-blue-700
+                                text-white
+                                px-6
+                                py-3
+                                rounded-xl
+                                font-semibold
+                                transition
+                            "
+                                    >
+                                        📷 Start Camera
+                                    </button>
+                                )}
+
+                            </div>
+                        )}
+
+                    </div>
+
+
+                    {/* CAMERA CONTROLS */}
+
+                    {cameraReady && (
+                        <div
+                            className="
+                    grid
+                    grid-cols-1
+                    sm:grid-cols-2
+                    gap-3
+                    mt-4
+                "
+                        >
 
                             <button
                                 type="button"
-                                onClick={startCamera}
+                                onClick={capturePhoto}
                                 className="
-                                    bg-blue-600
-                                    hover:bg-blue-700
-                                    text-white
-                                    px-6
-                                    py-3
-                                    rounded-xl
-                                    font-semibold
-                                    transition
-                                "
+                        bg-blue-600
+                        hover:bg-blue-700
+                        text-white
+                        py-3
+                        rounded-xl
+                        font-semibold
+                        transition
+                    "
                             >
-                                Start Camera
+                                📸 Capture Photo
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    changeMode("browse")
+                                }
+                                className="
+                        bg-gray-100
+                        dark:bg-gray-700
+                        hover:bg-gray-200
+                        dark:hover:bg-gray-600
+                        text-gray-800
+                        dark:text-white
+                        py-3
+                        rounded-xl
+                        font-semibold
+                        transition
+                    "
+                            >
+                                Cancel
                             </button>
 
                         </div>
-
-                    ) : (
-
-                        <>
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="
-                                    w-full
-                                    max-h-[450px]
-                                    rounded-2xl
-                                    bg-black
-                                    object-contain
-                                "
-                            />
-
-                            <div
-                                className="
-                                    grid
-                                    grid-cols-1
-                                    sm:grid-cols-2
-                                    gap-3
-                                    mt-4
-                                "
-                            >
-
-                                <button
-                                    type="button"
-                                    onClick={capturePhoto}
-                                    className="
-                                        bg-blue-600
-                                        hover:bg-blue-700
-                                        text-white
-                                        py-3
-                                        rounded-xl
-                                        font-semibold
-                                        transition
-                                    "
-                                >
-                                    📸 Capture Photo
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        changeMode("browse")
-                                    }
-                                    className="
-                                        bg-gray-100
-                                        dark:bg-gray-700
-                                        hover:bg-gray-200
-                                        dark:hover:bg-gray-600
-                                        text-gray-800
-                                        dark:text-white
-                                        py-3
-                                        rounded-xl
-                                        font-semibold
-                                        transition
-                                    "
-                                >
-                                    Cancel
-                                </button>
-
-                            </div>
-                        </>
                     )}
 
                 </div>
             )}
-
 
             {/* ======================================
                 URL
