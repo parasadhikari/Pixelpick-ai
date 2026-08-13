@@ -28,6 +28,7 @@ const Workspace = ({ imageUrl, removeImage }) => {
 
     const {
         palette,
+        otherColors,
         generatePalette,
     } = usePalette();
 
@@ -143,6 +144,7 @@ const Workspace = ({ imageUrl, removeImage }) => {
                         {/* AI Palette */}
                         <Palette
                             palette={palette}
+                            otherColors={otherColors}
                         />
 
 
@@ -153,6 +155,7 @@ const Workspace = ({ imageUrl, removeImage }) => {
                         {/* Export */}
                         <PaletteExport
                             palette={palette}
+                            otherColors={otherColors}
                         />
 
 

@@ -22,6 +22,10 @@ export default function useCanvas(
         displayY: null,
     });
 
+    // ==========================================
+    // DRAW IMAGE
+    // ==========================================
+
     const drawImage = useCallback((imageUrl) => {
         if (!canvasRef.current || !imageUrl) return;
 
@@ -76,8 +80,19 @@ export default function useCanvas(
             );
         };
 
+        img.onerror = () => {
+            console.error(
+                "Failed to load image:",
+                imageUrl
+            );
+        };
+
         img.src = imageUrl;
     }, []);
+
+    // ==========================================
+    // GET COLOR + MOUSE POSITION
+    // ==========================================
 
     const getColor = useCallback((event) => {
         const canvas = canvasRef.current;
@@ -120,20 +135,25 @@ export default function useCanvas(
             )
         );
 
-        // Update cursor position
+        // Save BOTH actual canvas position
+        // and displayed screen position
         setMousePosition({
             x,
             y,
+
             displayX:
                 event.clientX - rect.left,
+
             displayY:
                 event.clientY - rect.top,
         });
 
-        const ctx =
-            canvas.getContext("2d", {
+        const ctx = canvas.getContext(
+            "2d",
+            {
                 willReadFrequently: true,
-            });
+            }
+        );
 
         const pixel =
             ctx.getImageData(
@@ -171,13 +191,14 @@ export default function useCanvas(
         };
     }, []);
 
-    // ==============================
+    // ==========================================
     // MOUSE MOVE
-    // ==============================
+    // ==========================================
 
     const handleMove = useCallback(
         (event) => {
-            const color = getColor(event);
+            const color =
+                getColor(event);
 
             if (color) {
                 setHoverColor(color);
@@ -189,27 +210,11 @@ export default function useCanvas(
         ]
     );
 
-    // ==============================
-    // CLICK
-    // ==============================
-
-    const handleClick = useCallback(
-        (event) => {
-            const color = getColor(event);
-
-            if (color) {
-                setSelectedColor(color);
-            }
-        },
-        [
-            getColor,
-            setSelectedColor,
-        ]
-    );
-
-    // ==============================
+    // ==========================================
     // MOUSE LEAVE
-    // ==============================
+    // IMPORTANT:
+    // This hides the zoom/crosshair
+    // ==========================================
 
     const handleLeave = useCallback(() => {
         setMousePosition({
@@ -222,13 +227,35 @@ export default function useCanvas(
         setHoverColor(null);
     }, [setHoverColor]);
 
+    // ==========================================
+    // CLICK
+    // ==========================================
+
+    const handleClick = useCallback(
+        (event) => {
+            const color =
+                getColor(event);
+
+            if (color) {
+                setSelectedColor(color);
+            }
+        },
+        [
+            getColor,
+            setSelectedColor,
+        ]
+    );
+
+    // ==========================================
+    // RETURN
+    // ==========================================
+
     return {
         canvasRef,
         mousePosition,
         drawImage,
-
         handleMove,
-        handleClick,
         handleLeave,
+        handleClick,
     };
 }

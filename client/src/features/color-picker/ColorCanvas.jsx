@@ -12,7 +12,6 @@ const ColorCanvas = ({ imageUrl, canvas }) => {
         handleLeave,
         mousePosition,
     } = canvas;
-
     const { overlayColor } = useOverlay();
 
     useEffect(() => {
@@ -37,18 +36,19 @@ const ColorCanvas = ({ imageUrl, canvas }) => {
             <canvas
                 ref={canvasRef}
                 onMouseMove={handleMove}
+                onMouseLeave={handleLeave}
                 onClick={handleClick}
                 className="
-                    max-w-full
-                    max-h-full
-                    w-auto
-                    h-auto
-                    rounded-2xl
-                    border
-                    border-gray-200
-                    dark:border-gray-700
-                    shadow-sm
-                "
+        max-w-full
+        max-h-full
+        w-auto
+        h-auto
+        rounded-2xl
+        border
+        border-gray-200
+        dark:border-gray-700
+        shadow-sm
+    "
             />
 
             {/* ==============================
