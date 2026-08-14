@@ -1,6 +1,7 @@
 import UploadBox from "../features/image-upload/UploadBox";
 import ImagePreview from "../features/image-upload/ImagePreview";
 import useImageUpload from "../hooks/useImageUpload";
+import SEO from "../components/SEO";
 
 const Home = () => {
     const {
@@ -11,6 +12,12 @@ const Home = () => {
 
     return (
         <div className="min-h-screen">
+
+            <SEO
+                title="Image Color Picker & Palette Generator | PixelPick AI"
+                description="Extract colors from images with PixelPick AI. Pick exact HEX, RGB and HSL colors, generate color palettes, check contrast, create gradients and export palettes."
+                canonical="https://pixelpick-ai.vercel.app/"
+            />
             <h1 className="text-5xl font-bold text-center text-gray-900 dark:text-white">
                 Image Color Picker & Palette Generator
             </h1>

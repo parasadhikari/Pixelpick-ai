@@ -1,9 +1,9 @@
 import { Routes, Route } from "react-router-dom";
 
 import MainLayout from "./layouts/MainLayout";
-
 import Home from "./pages/Home";
 import About from "./pages/About";
+import Tools from "./pages/Tools";
 
 function App() {
   return (
@@ -20,7 +20,7 @@ function App() {
         {/* Tools */}
         <Route
           path="/tools"
-          element={<Home />}
+          element={<Tools />}
         />
 
         {/* About */}
