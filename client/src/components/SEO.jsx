@@ -6,32 +6,69 @@ const SEO = ({
     canonical,
 }) => {
     useEffect(() => {
+        // ==============================
+        // Basic SEO
+        // ==============================
+
         document.title = title;
 
-        const setMeta = (name, content) => {
+        const setMeta = (
+            attribute,
+            value,
+            content
+        ) => {
             let tag = document.querySelector(
-                `meta[name="${name}"]`
+                `meta[${attribute}="${value}"]`
             );
 
             if (!tag) {
                 tag = document.createElement("meta");
-                tag.setAttribute("name", name);
+
+                tag.setAttribute(
+                    attribute,
+                    value
+                );
+
                 document.head.appendChild(tag);
             }
 
-            tag.setAttribute("content", content);
+            tag.setAttribute(
+                "content",
+                content
+            );
         };
 
-        setMeta("description", description);
-
-        let canonicalTag = document.querySelector(
-            'link[rel="canonical"]'
+        // Meta description
+        setMeta(
+            "name",
+            "description",
+            description
         );
 
+
+        // ==============================
+        // Canonical URL
+        // ==============================
+
+        let canonicalTag =
+            document.querySelector(
+                'link[rel="canonical"]'
+            );
+
         if (!canonicalTag) {
-            canonicalTag = document.createElement("link");
-            canonicalTag.setAttribute("rel", "canonical");
-            document.head.appendChild(canonicalTag);
+            canonicalTag =
+                document.createElement(
+                    "link"
+                );
+
+            canonicalTag.setAttribute(
+                "rel",
+                "canonical"
+            );
+
+            document.head.appendChild(
+                canonicalTag
+            );
         }
 
         canonicalTag.setAttribute(
@@ -39,8 +76,69 @@ const SEO = ({
             canonical
         );
 
-        return () => {};
-    }, [title, description, canonical]);
+
+        // ==============================
+        // Open Graph
+        // ==============================
+
+        setMeta(
+            "property",
+            "og:type",
+            "website"
+        );
+
+        setMeta(
+            "property",
+            "og:url",
+            canonical
+        );
+
+        setMeta(
+            "property",
+            "og:title",
+            title
+        );
+
+        setMeta(
+            "property",
+            "og:description",
+            description
+        );
+
+        setMeta(
+            "property",
+            "og:site_name",
+            "PixelPick AI"
+        );
+
+
+        // ==============================
+        // Twitter / X
+        // ==============================
+
+        setMeta(
+            "name",
+            "twitter:card",
+            "summary"
+        );
+
+        setMeta(
+            "name",
+            "twitter:title",
+            title
+        );
+
+        setMeta(
+            "name",
+            "twitter:description",
+            description
+        );
+
+    }, [
+        title,
+        description,
+        canonical,
+    ]);
 
     return null;
 };
